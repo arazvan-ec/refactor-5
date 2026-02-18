@@ -1,0 +1,55 @@
+# Auto-generated spec manifest
+# Updated by /workflows:discover on 2026-02-17
+
+manifest:
+  version: "1.0"
+  generated_at: "2026-02-17T20:40:00Z"
+  project: "snaapi"
+
+  statistics:
+    entities: 1
+    api_contracts: 1
+    business_rules: 10
+    architectural_constraints: 1
+    api_consumers: 8
+    total_specs: 21
+
+  entities:
+    - name: "Editorial"
+      file: "entities/editorial.yaml"
+      type: "aggregate"
+      last_updated: "2026-02-17T20:40:00Z"
+
+  api_contracts:
+    - name: "Editorials API v1"
+      file: "api-contracts/editorials-v1.yaml"
+      endpoints: 1
+      last_updated: "2026-02-17T20:40:00Z"
+
+  business_rules:
+    - domain_area: "Editorial Content"
+      file: "business-rules/editorial-domain.yaml"
+      rules_count: 10
+      critical_rules: 1
+      last_updated: "2026-02-17T20:40:00Z"
+
+  architectural_constraints:
+    - category: "Layer and Dependency Constraints"
+      file: "architectural-constraints/layer-constraints.yaml"
+      constraints_count: 12
+      last_updated: "2026-02-17T20:40:00Z"
+
+  api_consumers: []
+    # External API consumers detected but specs stored in architecture-profile.yaml
+
+  api_architecture_diagnostic:
+    file: "api-architecture-diagnostic.yaml"
+    dimensions_classified: 6
+    last_updated: "2026-02-17T20:40:00Z"
+
+  extraction_config:
+    extract_specs: true
+    depth: "standard"
+    include_tests: false
+
+  next_recommended_update: "2026-02-24T20:40:00Z"

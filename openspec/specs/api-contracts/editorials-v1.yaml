@@ -1,0 +1,111 @@
+api_contract:
+  name: "Editorials API v1"
+  version: "1.0.0"
+  base_path: "/v1/editorials"
+  description: "Editorial content aggregation endpoint for mobile applications"
+
+  endpoints:
+    - method: "GET"
+      path: "/{id}"
+      description: "Retrieve a complete editorial with all related data (section, tags, journalists, multimedia, body, comments, recommendations)"
+
+      parameters:
+        - name: "id"
+          in: "path"
+          type: "string"
+          required: true
+          description: "Editorial unique identifier"
+
+      responses:
+        - status: 200
+          description: "Editorial found and visible"
+          schema:
+            type: object
+            properties:
+              id: { type: "string" }
+              url: { type: "string", description: "Full editorial URL" }
+              titles:
+                type: object
+                properties:
+                  title: { type: "string" }
+                  preTitle: { type: "string" }
+                  urlTitle: { type: "string" }
+                  mobileTitle: { type: "string" }
+              lead: { type: "string", description: "Standfirst/summary" }
+              publicationDate: { type: "datetime" }
+              updatedOn: { type: "datetime" }
+              endOn: { type: "datetime" }
+              type:
+                type: object
+                properties:
+                  id: { type: "string" }
+                  name: { type: "string" }
+              indexable: { type: "boolean" }
+              deleted: { type: "boolean" }
+              published: { type: "boolean" }
+              closingModeId: { type: "string", enum: ["", "registry", "payment", "apppayment"] }
+              commentable: { type: "boolean" }
+              isBrand: { type: "boolean" }
+              isAmazonOnsite: { type: "boolean" }
+              contentType: { type: "string" }
+              canonicalEditorialId: { type: "string" }
+              urlDate: { type: "datetime" }
+              countWords: { type: "integer" }
+              body:
+                type: object
+                properties:
+                  type: { type: "string", enum: ["normal"] }
+                  elements: { type: "array", description: "Body elements (paragraph, subhead, picture, video, html, list, etc.)" }
+              signatures: { type: "array", description: "Journalist/author information" }
+              section:
+                type: object
+                properties:
+                  id: { type: "string" }
+                  name: { type: "string" }
+                  url: { type: "string" }
+              tags: { type: "array", description: "Content tags" }
+              countComments: { type: "integer" }
+              multimedia: { type: "object", description: "Opening multimedia (photo/video/widget)" }
+              standfirst: { type: "object", description: "Opening summary with multimedia" }
+              recommendedEditorials: { type: "array", description: "Related editorial recommendations" }
+
+        - status: 404
+          description: "Editorial not found or not published"
+          schema:
+            type: object
+            properties:
+              error: { type: "string", example: "Editorial not published" }
+
+        - status: 500
+          description: "Internal server error"
+          schema:
+            type: object
+            properties:
+              errors: { type: "array", items: { type: "string" } }
+
+      authentication: "none"
+      rate_limit: "none detected"
+
+  caching:
+    success:
+      s_maxage: 7200
+      max_age: 60
+      stale_while_revalidate: 60
+      stale_if_error: 259200
+    error:
+      s_maxage: 64000
+      max_age: 60
+      stale_while_revalidate: 60
+      stale_if_error: 259200
+
+  host_requirements:
+    pattern: "snaapi(-prod-[0-9]+)?.elconfidencial.(local|dev|pre|com|ims|efim)"
+    internal: "ecsnaapi-service"
+
+  source_files:
+    - "src/Controller/V1/EditorialController.php"
+    - "src/Controller/V1/Schemas/"
+    - "config/routes/v1.yaml"
+    - "src/EventSubscriber/CacheControlSubscriber.php"
+
+  extracted_at: "2026-02-17T20:40:00Z"

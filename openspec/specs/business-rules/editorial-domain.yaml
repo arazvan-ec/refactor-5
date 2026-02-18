@@ -1,0 +1,167 @@
+business_rules:
+  domain_area: "Editorial Content"
+  description: "Rules governing editorial content visibility, type handling, and response assembly"
+
+  rules:
+    - id: "BR-ED-001"
+      name: "Editorial Visibility Gate"
+      description: "Only visible (published) editorials can be served via API"
+      type: "validation"
+      condition:
+        when: "GET /editorials/{id} request received"
+        given: "Editorial fetched from editorial service"
+        then: "If editorial.isVisible() is false, throw EditorialNotPublishedYetException (404)"
+      implementation:
+        location: "src/Orchestrator/Chain/EditorialOrchestrator.php"
+        method: "execute()"
+        line: 110
+        pattern: "guard-clause"
+      related_entities: ["Editorial"]
+      priority: "critical"
+
+    - id: "BR-ED-002"
+      name: "Inserted News Visibility Filter"
+      description: "Only visible inserted news are included in the response body"
+      type: "constraint"
+      condition:
+        when: "Editorial body contains BodyTagInsertedNews elements"
+        given: "Each referenced editorial is fetched individually"
+        then: "Skip non-visible editorials silently"
+      implementation:
+        location: "src/Orchestrator/Chain/EditorialOrchestrator.php"
+        method: "execute()"
+        line: 125
+        pattern: "filter"
+      related_entities: ["Editorial", "BodyTagInsertedNews"]
+      priority: "high"
+
+    - id: "BR-ED-003"
+      name: "Recommended Editorial Visibility Filter"
+      description: "Only visible recommended editorials are included, with error tolerance"
+      type: "constraint"
+      condition:
+        when: "Editorial has recommended editorials"
+        given: "Each recommended editorial is fetched individually"
+        then: "Skip non-visible or errored editorials (try-catch-continue)"
+      implementation:
+        location: "src/Orchestrator/Chain/EditorialOrchestrator.php"
+        method: "execute()"
+        line: 167
+        pattern: "filter + error-tolerance"
+      related_entities: ["Editorial"]
+      priority: "high"
+
+    - id: "BR-ED-004"
+      name: "Twitter Info Only for Blog Type"
+      description: "Twitter user information is only fetched for blog-type editorials"
+      type: "workflow"
+      condition:
+        when: "Processing journalist signatures"
+        given: "Editorial type is known"
+        then: "Include Twitter handle only if editorialType is BLOG"
+      implementation:
+        location: "src/Orchestrator/Chain/EditorialOrchestrator.php"
+        method: "execute()"
+        line: 244
+        pattern: "conditional"
+      related_entities: ["Editorial", "Journalist"]
+      priority: "medium"
+
+    - id: "BR-ED-005"
+      name: "Editorial Type Mapping"
+      description: "Map editorial type ID to human-readable name"
+      type: "calculation"
+      condition:
+        when: "Transforming editorial for response"
+        given: "Editorial type ID"
+        then: "Map to: NEWS(1), BLOG(3), LIVESPORT(12), LIVE(13), CHRONICLE(14), LOVERS(15). Default: NEWS"
+      implementation:
+        location: "src/Infrastructure/Enum/EditorialTypesEnum.php"
+        method: "getNameById()"
+        pattern: "enum"
+      related_entities: ["Editorial"]
+      priority: "medium"
+
+    - id: "BR-ED-006"
+      name: "Closing Mode Mapping"
+      description: "Map closing mode to paywall type"
+      type: "calculation"
+      condition:
+        when: "Transforming editorial for response"
+        given: "Closing mode ID"
+        then: "Map to: REGISTRY(1), PAYMENT(2), APPPAYMENT(3), empty string for none"
+      implementation:
+        location: "src/Infrastructure/Enum/ClossingModeEnum.php"
+        method: "getNameById()"
+        pattern: "enum"
+      related_entities: ["Editorial"]
+      priority: "medium"
+
+    - id: "BR-ED-007"
+      name: "Site-Based URL Generation"
+      description: "Generate editorial URLs based on site ID mapping"
+      type: "calculation"
+      condition:
+        when: "Building editorial URL for response"
+        given: "Section with siteId"
+        then: "Map siteId 1=elconfidencial, 2=vanitatis, 5=alimente. Blog sections use blog. subdomain"
+      implementation:
+        location: "src/Infrastructure/Enum/SitesEnum.php"
+        method: "static methods"
+        pattern: "enum"
+      related_entities: ["Section", "Editorial"]
+      priority: "medium"
+
+    - id: "BR-ED-008"
+      name: "Journalist Photo Priority"
+      description: "Journalist photo selection follows priority order"
+      type: "calculation"
+      condition:
+        when: "Transforming journalist signature"
+        given: "Journalist with optional photos"
+        then: "Priority: 1) Blog photo, 2) Standard photo, 3) Empty string"
+      implementation:
+        location: "src/Application/DataTransformer/Apps/JournalistsDataTransformer.php"
+        method: "read()"
+        line: 111
+        pattern: "fallback-chain"
+      related_entities: ["Journalist"]
+      priority: "low"
+
+    - id: "BR-ED-009"
+      name: "Twitter Username Validation"
+      description: "Validate Twitter username format before display"
+      type: "validation"
+      condition:
+        when: "Transforming journalist with Twitter"
+        given: "Twitter username string"
+        then: "Must match ^([A-Za-z0-9_]{1,15})$, prepend @ if valid, empty string otherwise"
+      implementation:
+        location: "src/Application/DataTransformer/Apps/JournalistsDataTransformer.php"
+        pattern: "regex-validation"
+      related_entities: ["Journalist"]
+      priority: "low"
+
+    - id: "BR-ED-010"
+      name: "Cache Control Headers"
+      description: "HTTP cache headers based on response status"
+      type: "constraint"
+      condition:
+        when: "Response is sent"
+        given: "Response status code"
+        then: "Success: s-maxage=7200, max-age=60. Error: s-maxage=64000, max-age=60. Both: stale-while-revalidate=60, stale-if-error=259200"
+      implementation:
+        location: "src/EventSubscriber/CacheControlSubscriber.php"
+        pattern: "event-subscriber"
+      related_entities: []
+      priority: "high"
+
+  source_files:
+    - "src/Orchestrator/Chain/EditorialOrchestrator.php"
+    - "src/Infrastructure/Enum/EditorialTypesEnum.php"
+    - "src/Infrastructure/Enum/ClossingModeEnum.php"
+    - "src/Infrastructure/Enum/SitesEnum.php"
+    - "src/Application/DataTransformer/Apps/JournalistsDataTransformer.php"
+    - "src/EventSubscriber/CacheControlSubscriber.php"
+
+  extracted_at: "2026-02-17T20:40:00Z"

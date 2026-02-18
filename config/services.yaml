@@ -22,8 +22,8 @@ services:
             - '../src/Kernel.php'
             - '../src/Controller/V1/'
             - '../src/Ec/Snaapi/Infrastructure/'
-            - '../src/Application/DataTransformer/Apps/Body/'
-            - '../src/Application/DataTransformer/Apps/Media/DataTransformers/'
+            - '../src/Editorial/Assembler/Apps/Body/'
+            - '../src/Editorial/Assembler/Apps/Media/'
 
     # add more service definitions when explicit configuration is needed
     # please note that last definitions always *replace* previous ones

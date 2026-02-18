@@ -7,36 +7,51 @@ services:
         bind:
             $extension: '%env(URL_ENV)%'
 
-    App\Application\DataTransformer\Apps\AppsDataTransformer: '@App\Application\DataTransformer\Apps\DetailsAppsDataTransformer'
-
-    App\Application\DataTransformer\Apps\Body\:
-        resource: '../../src/Application/DataTransformer/Apps/Body/'
+    # Editorial module: body element transformers
+    App\Editorial\Assembler\Apps\Body\:
+        resource: '../../src/Editorial/Assembler/Apps/Body/'
         exclude:
-            - '../../src/Application/DataTransformer/Apps/Body/BodyTagVideoYoutubeDataTransformer'
-            - '../../src/Application/DataTransformer/Apps/Body/BodyTagVideoDataTransformer'
-        tags: [ 'app.data_transformer' ]
-        lazy: true
-        shared: true
+            - '../../src/Editorial/Assembler/Apps/Body/BodyTagVideoTransformer.php'
+            - '../../src/Editorial/Assembler/Apps/Body/BodyTagVideoYoutubeTransformer.php'
+            - '../../src/Editorial/Assembler/Apps/Body/BodyElementTransformer.php'
+            - '../../src/Editorial/Assembler/Apps/Body/BodyTransformerPipeline.php'
+        tags: [ 'app.body_element_transformer' ]
 
-    App\Application\DataTransformer\Apps\Media\DataTransformers\:
-        resource: '../../src/Application/DataTransformer/Apps/Media/DataTransformers/'
-        tags: [ 'app.media_data_transformer' ]
-        lazy: true
-        shared: true
-
-    App\Application\DataTransformer\Apps\Body\BodyTagVideoYoutubeDataTransformer:
-        class: App\Application\DataTransformer\Apps\Body\BodyTagVideoYoutubeDataTransformer
+    App\Editorial\Assembler\Apps\Body\BodyTagVideoTransformer:
         arguments:
             $playerHost: '%env(PLAYER_HOST)%'
-        tags: [ 'app.data_transformer' ]
-        lazy: true
-        shared: true
+        tags: [ 'app.body_element_transformer' ]
 
-    App\Application\DataTransformer\Apps\Body\BodyTagVideoDataTransformer:
-        class: App\Application\DataTransformer\Apps\Body\BodyTagVideoDataTransformer
+    App\Editorial\Assembler\Apps\Body\BodyTagVideoYoutubeTransformer:
         arguments:
             $playerHost: '%env(PLAYER_HOST)%'
-        tags: [ 'app.data_transformer' ]
-        lazy: true
-        shared: true
+        tags: [ 'app.body_element_transformer' ]
 
+    App\Editorial\Assembler\Apps\Body\BodyTransformerPipeline:
+        class: App\Editorial\Assembler\Apps\Body\BodyTransformerPipeline
+
+    # Editorial module: media transformers
+    App\Editorial\Assembler\Apps\Media\:
+        resource: '../../src/Editorial/Assembler/Apps/Media/'
+        exclude:
+            - '../../src/Editorial/Assembler/Apps/Media/MediaTransformer.php'
+            - '../../src/Editorial/Assembler/Apps/Media/MediaTransformerPipeline.php'
+            - '../../src/Editorial/Assembler/Apps/Media/Widget/'
+        tags: [ 'app.media_transformer' ]
+
+    App\Editorial\Assembler\Apps\Media\MediaTransformerPipeline:
+        class: App\Editorial\Assembler\Apps\Media\MediaTransformerPipeline
+
+    # Editorial module: widget transformers
+    App\Editorial\Assembler\Apps\Media\Widget\:
+        resource: '../../src/Editorial/Assembler/Apps/Media/Widget/'
+        exclude:
+            - '../../src/Editorial/Assembler/Apps/Media/Widget/WidgetTypeTransformer.php'
+            - '../../src/Editorial/Assembler/Apps/Media/Widget/WidgetTransformerPipeline.php'
+        tags: [ 'app.widget_type_transformer' ]
+
+    App\Editorial\Assembler\Apps\Media\Widget\WidgetTransformerPipeline:
+        class: App\Editorial\Assembler\Apps\Media\Widget\WidgetTransformerPipeline
+
+    # Wire ResponseAssemblerInterface to AppsAssembler
+    App\Editorial\Assembler\ResponseAssemblerInterface: '@App\Editorial\Assembler\Apps\AppsAssembler'

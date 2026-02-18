@@ -1,0 +1,110 @@
+architectural_constraints:
+  category: "Layer and Dependency Constraints"
+  description: "Architectural rules governing layer dependencies, module boundaries, and design patterns in SNAAPI"
+
+  layer_constraints:
+    - name: "No Local Persistence"
+      description: "SNAAPI is a pure API Gateway - it does NOT persist data locally"
+      rule: "No database migrations, ORM, or local entity persistence"
+      enforcement: "architecture-review"
+      violations_found: 0
+
+    - name: "External Domain Models Only"
+      description: "Domain models come from vendor packages (ec/*-client), not local domain layer"
+      rule: "No src/Domain/ directory - domain models are external"
+      enforcement: "composer-packages"
+      violations_found: 0
+
+    - name: "Controller Thinness"
+      description: "Controllers delegate to orchestrators, do not contain business logic"
+      rule: "Controller methods <=20 LOC, delegate to OrchestratorChainHandler"
+      enforcement: "code-review"
+      violations_found: 0
+
+    - name: "Dependency Direction"
+      description: "Dependencies point from presentation inward"
+      layers:
+        - { name: "presentation", path: "src/Controller/", can_depend_on: ["application"] }
+        - { name: "application", path: "src/Application/, src/Orchestrator/", can_depend_on: ["domain-external-packages"] }
+        - { name: "infrastructure", path: "src/Infrastructure/, src/Ec/", can_depend_on: ["domain-external-packages"] }
+        - { name: "framework", path: "src/DependencyInjection/", can_depend_on: ["application", "infrastructure"] }
+
+  pattern_constraints:
+    - name: "Chain of Responsibility for Content Types"
+      description: "Content types routed via chain pattern with compiler pass registration"
+      applies_to: "src/Orchestrator/"
+      pattern: "Chain of Responsibility"
+      registration: "Compiler Passes + service tags"
+
+    - name: "Strategy Pattern for Data Transformers"
+      description: "Type-specific transformers selected at runtime by element class"
+      applies_to: "src/Application/DataTransformer/"
+      pattern: "Strategy"
+      registration: "Compiler Passes + service tags (app.data_transformer)"
+
+    - name: "Write-Read Interface"
+      description: "Data transformers follow write($data)->read() fluent pattern"
+      applies_to: "src/Application/DataTransformer/"
+      pattern: "Fluent Interface"
+
+    - name: "Service Registration via Tags"
+      description: "Dynamic service registration via Symfony service tags and Compiler Passes"
+      applies_to: "src/DependencyInjection/Compiler/"
+      tags:
+        - "app.orchestrators"
+        - "app.data_transformer"
+        - "app.media_data_transformer"
+        - "ec.widget.dataTransformer"
+
+  technology_constraints:
+    - name: "PHP Version"
+      description: "Minimum PHP 8.1 required"
+      allowed: ["8.1", "8.2", "8.3"]
+      reason: "Symfony 6.4 LTS requirement, enum support"
+
+    - name: "HTTP Client Abstraction"
+      description: "All HTTP calls via HTTPPlug abstraction"
+      allowed: ["php-http/httplug-bundle", "php-http/guzzle7-adapter"]
+      forbidden: ["direct curl calls", "native file_get_contents"]
+      reason: "PSR-18 compliance, testability, plugin architecture"
+
+    - name: "Code Style"
+      description: "PSR-12 + Symfony coding standards enforced"
+      enforcement: "php-cs-fixer via make test_cs"
+
+    - name: "Static Analysis"
+      description: "PHPStan Level 9 (maximum strictness)"
+      enforcement: "phpstan via make test_stan"
+
+    - name: "Mutation Testing"
+      description: "Infection mutation testing with MSI thresholds"
+      thresholds:
+        min_msi: 86
+        min_covered_msi: 87
+      enforcement: "infection via make test_infection"
+
+  performance_constraints:
+    - name: "HTTP Client Timeout"
+      description: "External service calls timeout at 2 seconds"
+      threshold: "2000ms"
+      implementation: "config/packages/httplug.yaml"
+
+    - name: "HTTP Retry Policy"
+      description: "Failed HTTP calls retried with backoff"
+      threshold: "3 retries, 500ms delay"
+      implementation: "config/packages/httplug.yaml (retry plugin)"
+
+    - name: "Lazy Service Loading"
+      description: "Query clients configured as lazy-loaded singletons"
+      threshold: "lazy: true, shared: true"
+      implementation: "config/packages/*/infrastructure.yaml"
+
+  source_evidence:
+    - "config/services.yaml"
+    - "config/packages/httplug.yaml"
+    - "src/Kernel.php"
+    - "phpstan.neon"
+    - "infection.json.dist"
+    - ".php-cs-fixer.dist.php"
+
+  extracted_at: "2026-02-17T20:40:00Z"

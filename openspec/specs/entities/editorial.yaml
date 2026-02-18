@@ -1,0 +1,131 @@
+entity:
+  name: "Editorial"
+  type: "aggregate"
+  description: "Main content unit representing an editorial article. Fetched from external editorial microservice. Central entity of the SNAAPI gateway."
+  source_package: "ec/editorial-client ^2.2"
+
+  attributes:
+    - name: "id"
+      type: "EditorialId (Value Object)"
+      required: true
+      description: "Unique editorial identifier"
+    - name: "editorialType"
+      type: "string"
+      required: true
+      description: "Type of editorial (news, blog, livesport, live, chronicle, lovers)"
+    - name: "isVisible"
+      type: "boolean"
+      required: true
+      description: "Whether the editorial is published and visible"
+    - name: "isPublished"
+      type: "boolean"
+      required: true
+    - name: "isDeleted"
+      type: "boolean"
+      required: true
+    - name: "indexed"
+      type: "boolean"
+      required: true
+    - name: "title"
+      type: "string"
+      required: true
+    - name: "preTitle"
+      type: "string"
+      required: false
+    - name: "urlTitle"
+      type: "string"
+      required: true
+    - name: "mobileTitle"
+      type: "string"
+      required: false
+    - name: "lead"
+      type: "string"
+      required: false
+      description: "Standfirst/summary text"
+    - name: "publicationDate"
+      type: "datetime"
+      required: true
+    - name: "updatedOn"
+      type: "datetime"
+      required: false
+    - name: "endOn"
+      type: "datetime"
+      required: false
+    - name: "sectionId"
+      type: "string"
+      required: true
+    - name: "body"
+      type: "Body"
+      required: true
+    - name: "signatures"
+      type: "ArrayCollection<Signature>"
+      required: true
+    - name: "multimedia"
+      type: "Multimedia"
+      required: false
+      description: "Opening/hero multimedia element"
+    - name: "metaImage"
+      type: "string"
+      required: false
+    - name: "closingMode"
+      type: "string"
+      required: false
+      description: "Paywall type (registry, payment, apppayment)"
+    - name: "commentable"
+      type: "boolean"
+      required: true
+    - name: "isBrand"
+      type: "boolean"
+      required: true
+    - name: "contentType"
+      type: "string"
+      required: true
+    - name: "canonicalEditorialId"
+      type: "string"
+      required: false
+    - name: "countWords"
+      type: "integer"
+      required: false
+
+  relations:
+    - target: "Section"
+      type: "many-to-one"
+      cardinality: "1"
+      description: "Editorial belongs to one section"
+    - target: "Multimedia"
+      type: "one-to-one"
+      cardinality: "0..1"
+      description: "Opening/hero multimedia"
+    - target: "Signature"
+      type: "one-to-many"
+      cardinality: "1..*"
+      description: "Author signatures"
+    - target: "Tag"
+      type: "many-to-many"
+      cardinality: "0..*"
+      description: "Content tags"
+    - target: "BodyElement"
+      type: "one-to-many"
+      cardinality: "0..*"
+      description: "Body content elements via Body composite"
+    - target: "Editorial (InsertedNews)"
+      type: "many-to-many"
+      cardinality: "0..*"
+      description: "Nested/referenced editorials"
+    - target: "Editorial (Recommended)"
+      type: "many-to-many"
+      cardinality: "0..*"
+      description: "Related editorial recommendations"
+
+  invariants:
+    - "Editorial must be visible (isVisible=true) to be served via API"
+    - "Editorial must have at least one signature"
+    - "Editorial must belong to a valid section"
+    - "Editorial type must be one of: news, blog, livesport, live, chronicle, lovers"
+
+  source_files:
+    - "Ec\\Editorial\\Domain\\Model\\Editorial (external package)"
+    - "src/Orchestrator/Chain/EditorialOrchestrator.php"
+    - "src/Controller/V1/EditorialController.php"
+
+  extracted_at: "2026-02-17T20:40:00Z"
