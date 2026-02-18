@@ -20,12 +20,7 @@ final readonly class MembershipResolver
     ) {
     }
 
-    /**
-     * Starts an async membership URL resolution promise.
-     *
-     * @return array{promise: Promise|null, links: array<int, string>}
-     */
-    public function startPromise(Editorial $editorial, string $siteId): array
+    public function startPromise(Editorial $editorial, string $siteId): MembershipPromiseResult
     {
         $linksData = $this->getLinksFromBody($editorial);
 
@@ -46,7 +41,7 @@ final readonly class MembershipResolver
             true,
         );
 
-        return ['promise' => $promise, 'links' => $links];
+        return new MembershipPromiseResult(promise: $promise, links: $links);
     }
 
     /**

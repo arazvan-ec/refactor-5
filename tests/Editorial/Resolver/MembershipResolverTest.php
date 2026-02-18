@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Editorial\Resolver;
 
+use App\Editorial\Resolver\MembershipPromiseResult;
 use App\Editorial\Resolver\MembershipResolver;
 use Ec\Editorial\Domain\Model\Body\Body;
 use Ec\Editorial\Domain\Model\Body\BodyTagMembershipCard;
@@ -74,8 +75,9 @@ final class MembershipResolverTest extends TestCase
 
         $result = $this->resolver->startPromise($editorialMock, '1');
 
-        static::assertSame($promiseMock, $result['promise']);
-        static::assertSame([$url1, $url2], $result['links']);
+        static::assertInstanceOf(MembershipPromiseResult::class, $result);
+        static::assertSame($promiseMock, $result->promise);
+        static::assertSame([$url1, $url2], $result->links);
     }
 
     #[Test]
