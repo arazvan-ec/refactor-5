@@ -7,15 +7,12 @@ namespace App\Editorial\Resolver;
 use App\Infrastructure\Service\MultimediaImageService;
 use Ec\Editorial\Domain\Model\Editorial;
 use Ec\Editorial\Domain\Model\EditorialId;
-use Ec\Editorial\Domain\Model\Multimedia\MultimediaId;
-use Ec\Editorial\Domain\Model\NewsBase;
 use Ec\Editorial\Domain\Model\QueryEditorialClient;
 use Ec\Editorial\Domain\Model\Signature;
 use Ec\Multimedia\Domain\Model\Multimedia\MultimediaPhoto;
 use Ec\Multimedia\Infrastructure\Client\Http\Media\QueryMultimediaClient as QueryMultimediaOpeningClient;
 use Ec\Section\Domain\Model\QuerySectionClient;
 use Ec\Section\Domain\Model\Section;
-use Http\Promise\Promise;
 use Psr\Log\LoggerInterface;
 
 final readonly class RecommendedResolver
@@ -34,20 +31,12 @@ final readonly class RecommendedResolver
     /**
      * Resolves recommended editorials.
      *
-     * Returns EditorialGroup data, unresolved multimedia promises, opening data, and raw editorial objects.
-     *
-     * @return array{
-     *     groups: array<string, array{editorial: Editorial, section: Section, signatures: array<int, array<string, mixed>>, multimediaId: string}>,
-     *     promises: array<int, Promise>,
-     *     multimediaOpening: array<string, array{opening: MultimediaPhoto, resource: \Ec\Multimedia\Domain\Model\Photo\Photo}>,
-     *     news: array<Editorial>
-     * }
+     * Returns typed RecommendedResult with groups, news, and unresolved multimedia data.
      */
-    public function resolve(Editorial $editorial): array
+    public function resolve(Editorial $editorial): RecommendedResult
     {
         $groups = [];
-        $promises = [];
-        $multimediaOpening = [];
+        $multimediaResult = new MultimediaResolutionResult();
         $news = [];
 
         $recommendedEditorials = $editorial->recommendedEditorials();
@@ -69,9 +58,8 @@ final readonly class RecommendedResolver
 
                 $signatures = $this->resolveSignaturesForEditorial($recommendedEditorial, $sectionRecommended);
 
-                [$multimediaId, $newPromises, $newOpening] = $this->resolveMultimediaForEditorial($recommendedEditorial);
-                $promises = array_merge($promises, $newPromises);
-                $multimediaOpening = array_merge($multimediaOpening, $newOpening);
+                [$multimediaId, $editorialMultimediaResult] = $this->resolveMultimediaForEditorial($recommendedEditorial);
+                $multimediaResult = $multimediaResult->merge($editorialMultimediaResult);
 
                 $groups[$idRecommended] = [
                     'editorial' => $recommendedEditorial,
@@ -87,12 +75,11 @@ final readonly class RecommendedResolver
             }
         }
 
-        return [
-            'groups' => $groups,
-            'promises' => $promises,
-            'multimediaOpening' => $multimediaOpening,
-            'news' => $news,
-        ];
+        return new RecommendedResult(
+            groups: $groups,
+            news: $news,
+            multimediaResult: $multimediaResult,
+        );
     }
 
     /**
@@ -118,27 +105,26 @@ final readonly class RecommendedResolver
     }
 
     /**
-     * @return array{0: string, 1: array<int, Promise>, 2: array<string, array{opening: MultimediaPhoto, resource: \Ec\Multimedia\Domain\Model\Photo\Photo}>}
+     * @return array{0: string, 1: MultimediaResolutionResult}
      */
     private function resolveMultimediaForEditorial(Editorial $editorial): array
     {
-        $promises = [];
-        $multimediaOpening = [];
-
         $multimediaId = $this->multimediaImageService->getMultimediaId($editorial->multimedia());
 
         if (null !== $multimediaId && !empty($multimediaId->id())) {
             $promises = $this->multimediaResolver->startAsync([$multimediaId->id()]);
 
-            return [$multimediaId->id(), $promises, $multimediaOpening];
+            return [$multimediaId->id(), new MultimediaResolutionResult(promises: $promises)];
         }
 
         $metaImageId = $editorial->metaImage();
         if (!empty($metaImageId)) {
             $multimediaOpening = $this->resolveMetaImage($metaImageId);
+
+            return [$metaImageId, new MultimediaResolutionResult(multimediaOpening: $multimediaOpening)];
         }
 
-        return [$metaImageId, $promises, $multimediaOpening];
+        return ['', new MultimediaResolutionResult()];
     }
 
     /**

@@ -80,9 +80,27 @@ final readonly class MultimediaResolver
     }
 
     /**
+     * Starts async multimedia resolution for an editorial, encapsulating the Widget check.
+     *
+     * Returns a MultimediaResolutionResult with promises (or empty if Widget/no multimedia).
+     */
+    public function startAsyncForEditorial(Editorial $editorial): MultimediaResolutionResult
+    {
+        $multimediaId = $this->multimediaImageService->getMultimediaId($editorial->multimedia());
+
+        if (null === $multimediaId || $editorial->multimedia() instanceof Widget) {
+            return new MultimediaResolutionResult();
+        }
+
+        $promises = $this->startAsync([$multimediaId->id()]);
+
+        return new MultimediaResolutionResult(promises: $promises);
+    }
+
+    /**
      * Extracts the multimedia ID string from an editorial, if available.
      */
-    public function extractMultimediaId(Editorial $editorial): ?string
+    private function extractMultimediaId(Editorial $editorial): ?string
     {
         $multimediaId = $this->multimediaImageService->getMultimediaId($editorial->multimedia());
 

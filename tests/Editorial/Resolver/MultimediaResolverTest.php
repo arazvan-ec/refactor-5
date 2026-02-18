@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Editorial\Resolver;
 
+use App\Editorial\Resolver\MultimediaResolutionResult;
 use App\Editorial\Resolver\MultimediaResolver;
 use App\Infrastructure\Service\MultimediaImageService;
 use Ec\Editorial\Domain\Model\Editorial;
@@ -149,7 +150,7 @@ final class MultimediaResolverTest extends TestCase
     }
 
     #[Test]
-    public function extractMultimediaIdShouldReturnNullWhenNoId(): void
+    public function startAsyncForEditorialShouldReturnEmptyResultWhenNoMultimediaId(): void
     {
         $editorialMock = $this->createMock(Editorial::class);
         $multimediaMock = $this->createMock(MultimediaEditorial::class);
@@ -159,27 +160,58 @@ final class MultimediaResolverTest extends TestCase
             ->method('getMultimediaId')
             ->willReturn(null);
 
-        $result = $this->resolver->extractMultimediaId($editorialMock);
+        $result = $this->resolver->startAsyncForEditorial($editorialMock);
 
-        static::assertNull($result);
+        static::assertInstanceOf(MultimediaResolutionResult::class, $result);
+        static::assertSame([], $result->promises);
+        static::assertSame([], $result->multimediaOpening);
     }
 
     #[Test]
-    public function extractMultimediaIdShouldReturnIdString(): void
+    public function startAsyncForEditorialShouldReturnEmptyResultForWidgets(): void
     {
         $editorialMock = $this->createMock(Editorial::class);
-        $multimediaMock = $this->createMock(MultimediaEditorial::class);
-        $editorialMock->method('multimedia')->willReturn($multimediaMock);
+        $widgetMock = $this->createMock(Widget::class);
+        $editorialMock->method('multimedia')->willReturn($widgetMock);
 
         $multimediaIdMock = $this->createMock(MultimediaId::class);
-        $multimediaIdMock->method('id')->willReturn('test-id');
+        $multimediaIdMock->method('id')->willReturn('widget-123');
 
         $this->multimediaImageService
             ->method('getMultimediaId')
             ->willReturn($multimediaIdMock);
 
-        $result = $this->resolver->extractMultimediaId($editorialMock);
+        $result = $this->resolver->startAsyncForEditorial($editorialMock);
 
-        static::assertSame('test-id', $result);
+        static::assertInstanceOf(MultimediaResolutionResult::class, $result);
+        static::assertSame([], $result->promises);
+    }
+
+    #[Test]
+    public function startAsyncForEditorialShouldReturnResultWithPromises(): void
+    {
+        $multimediaIdValue = 'photo-456';
+        $multimediaIdMock = $this->createMock(MultimediaId::class);
+        $multimediaIdMock->method('id')->willReturn($multimediaIdValue);
+
+        $photoExistMock = $this->createMock(PhotoExist::class);
+        $editorialMock = $this->createMock(Editorial::class);
+        $editorialMock->method('multimedia')->willReturn($photoExistMock);
+
+        $this->multimediaImageService
+            ->method('getMultimediaId')
+            ->willReturn($multimediaIdMock);
+
+        $promiseMock = $this->createMock(Promise::class);
+        $this->queryMultimediaClient
+            ->expects(static::once())
+            ->method('findMultimediaById')
+            ->with($multimediaIdValue, true)
+            ->willReturn($promiseMock);
+
+        $result = $this->resolver->startAsyncForEditorial($editorialMock);
+
+        static::assertInstanceOf(MultimediaResolutionResult::class, $result);
+        static::assertCount(1, $result->promises);
     }
 }

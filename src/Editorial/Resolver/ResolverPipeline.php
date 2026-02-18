@@ -6,7 +6,6 @@ namespace App\Editorial\Resolver;
 
 use App\Editorial\EditorialAggregate;
 use Ec\Editorial\Domain\Model\Editorial;
-use Ec\Editorial\Domain\Model\Multimedia\Widget;
 
 /**
  * Orchestrates all resolvers to build an EditorialAggregate.
@@ -49,12 +48,7 @@ final readonly class ResolverPipeline
         $signatures = $this->signaturesResolver->resolve($editorial, $section);
 
         // Step 5: Start async multimedia for the main editorial
-        $mainMultimediaId = $this->multimediaResolver->extractMultimediaId($editorial);
-        $allPromises = [];
-
-        if (null !== $mainMultimediaId && !$editorial->multimedia() instanceof Widget) {
-            $allPromises = $this->multimediaResolver->startAsync([$mainMultimediaId]);
-        }
+        $mainMultimediaResult = $this->multimediaResolver->startAsyncForEditorial($editorial);
 
         // Step 6: Resolve opening (synchronous)
         $multimediaOpening = $this->openingResolver->resolve($editorial);
@@ -62,30 +56,24 @@ final readonly class ResolverPipeline
         // Step 7: Resolve body photos
         $bodyPhotos = $this->bodyPhotosResolver->resolve($editorial->body());
 
-        // Step 8: Resolve inserted news (returns groups + unresolved promises)
+        // Step 8: Resolve inserted news
         $insertedResult = $this->insertedNewsResolver->resolve($editorial);
 
-        // Step 9: Resolve recommended editorials (returns groups + unresolved promises + news)
+        // Step 9: Resolve recommended editorials
         $recommendedResult = $this->recommendedResolver->resolve($editorial);
 
         // Step 10: Resolve comments
         $commentCount = $this->commentsResolver->resolve($editorial->id()->id());
 
-        // Step 11: Merge ALL multimedia promises and settle in a single batch
-        $allPromises = array_merge(
-            $allPromises,
-            $insertedResult['promises'],
-            $recommendedResult['promises'],
-        );
+        // Step 11: Merge all multimedia results and settle in a single batch
+        $mergedMultimedia = $mainMultimediaResult
+            ->merge($insertedResult->multimediaResult)
+            ->merge($recommendedResult->multimediaResult);
 
-        $multimedia = $this->multimediaResolver->settle($allPromises);
+        $multimedia = $this->multimediaResolver->settle($mergedMultimedia->promises);
 
-        // Step 12: Merge multimedia opening data from inserted/recommended
-        $multimediaOpening = array_merge(
-            $multimediaOpening,
-            $insertedResult['multimediaOpening'],
-            $recommendedResult['multimediaOpening'],
-        );
+        // Step 12: Merge multimedia opening data
+        $multimediaOpening = array_merge($multimediaOpening, $mergedMultimedia->multimediaOpening);
 
         // Step 13: Resolve membership links
         $membershipLinks = $this->membershipResolver->resolve(
@@ -102,9 +90,9 @@ final readonly class ResolverPipeline
             multimedia: $multimedia,
             multimediaOpening: $multimediaOpening,
             bodyPhotos: $bodyPhotos,
-            insertedNews: $insertedResult['groups'],
-            recommendedEditorials: $recommendedResult['groups'],
-            recommendedNews: $recommendedResult['news'],
+            insertedNews: $insertedResult->groups,
+            recommendedEditorials: $recommendedResult->groups,
+            recommendedNews: $recommendedResult->news,
             membershipLinks: $membershipLinks,
             commentCount: $commentCount,
         );

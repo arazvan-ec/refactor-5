@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Editorial\Resolver;
 
 use App\Editorial\Resolver\InsertedNewsResolver;
+use App\Editorial\Resolver\InsertedNewsResult;
 use App\Editorial\Resolver\MultimediaResolver;
 use App\Editorial\Resolver\SignaturesResolver;
 use App\Infrastructure\Service\MultimediaImageService;
@@ -75,9 +76,10 @@ final class InsertedNewsResolverTest extends TestCase
 
         $result = $this->resolver->resolve($editorialMock);
 
-        static::assertSame([], $result['groups']);
-        static::assertSame([], $result['promises']);
-        static::assertSame([], $result['multimediaOpening']);
+        static::assertInstanceOf(InsertedNewsResult::class, $result);
+        static::assertSame([], $result->groups);
+        static::assertSame([], $result->multimediaResult->promises);
+        static::assertSame([], $result->multimediaResult->multimediaOpening);
     }
 
     #[Test]
@@ -142,12 +144,13 @@ final class InsertedNewsResolverTest extends TestCase
 
         $result = $this->resolver->resolve($mainEditorialMock);
 
-        static::assertCount(1, $result['groups']);
-        static::assertArrayHasKey($insertedId, $result['groups']);
-        static::assertSame($insertedEditorialMock, $result['groups'][$insertedId]['editorial']);
-        static::assertSame($sectionMock, $result['groups'][$insertedId]['section']);
-        static::assertSame($multimediaIdValue, $result['groups'][$insertedId]['multimediaId']);
-        static::assertCount(1, $result['promises']);
+        static::assertInstanceOf(InsertedNewsResult::class, $result);
+        static::assertCount(1, $result->groups);
+        static::assertArrayHasKey($insertedId, $result->groups);
+        static::assertSame($insertedEditorialMock, $result->groups[$insertedId]['editorial']);
+        static::assertSame($sectionMock, $result->groups[$insertedId]['section']);
+        static::assertSame($multimediaIdValue, $result->groups[$insertedId]['multimediaId']);
+        static::assertCount(1, $result->multimediaResult->promises);
     }
 
     #[Test]
@@ -176,7 +179,7 @@ final class InsertedNewsResolverTest extends TestCase
 
         $result = $this->resolver->resolve($mainEditorialMock);
 
-        static::assertSame([], $result['groups']);
+        static::assertSame([], $result->groups);
     }
 
     #[Test]
@@ -207,6 +210,6 @@ final class InsertedNewsResolverTest extends TestCase
 
         $result = $this->resolver->resolve($mainEditorialMock);
 
-        static::assertSame([], $result['groups']);
+        static::assertSame([], $result->groups);
     }
 }

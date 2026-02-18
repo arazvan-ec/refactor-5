@@ -8,10 +8,13 @@ use App\Editorial\EditorialAggregate;
 use App\Editorial\Resolver\BodyPhotosResolver;
 use App\Editorial\Resolver\CommentsResolver;
 use App\Editorial\Resolver\InsertedNewsResolver;
+use App\Editorial\Resolver\InsertedNewsResult;
 use App\Editorial\Resolver\MembershipResolver;
+use App\Editorial\Resolver\MultimediaResolutionResult;
 use App\Editorial\Resolver\MultimediaResolver;
 use App\Editorial\Resolver\OpeningResolver;
 use App\Editorial\Resolver\RecommendedResolver;
+use App\Editorial\Resolver\RecommendedResult;
 use App\Editorial\Resolver\ResolverPipeline;
 use App\Editorial\Resolver\SectionResolver;
 use App\Editorial\Resolver\SignaturesResolver;
@@ -20,8 +23,6 @@ use Ec\Editorial\Domain\Model\Body\Body;
 use Ec\Editorial\Domain\Model\Editorial;
 use Ec\Editorial\Domain\Model\EditorialId;
 use Ec\Editorial\Domain\Model\Multimedia\Multimedia as MultimediaEditorial;
-use Ec\Editorial\Domain\Model\Multimedia\MultimediaId;
-use Ec\Editorial\Domain\Model\Multimedia\Widget;
 use Ec\Multimedia\Domain\Model\Multimedia\Multimedia as AbstractMultimedia;
 use Ec\Multimedia\Domain\Model\Photo\Photo;
 use Ec\Section\Domain\Model\Section;
@@ -79,17 +80,12 @@ final class ResolverPipelineTest extends TestCase
     {
         $editorialId = 'editorial-123';
         $siteId = '1';
-        $multimediaIdValue = 'multimedia-456';
 
         // Setup editorial mock
         $editorialIdMock = $this->createMock(EditorialId::class);
         $editorialIdMock->method('id')->willReturn($editorialId);
 
-        $multimediaIdDomainMock = $this->createMock(MultimediaId::class);
-        $multimediaIdDomainMock->method('id')->willReturn($multimediaIdValue);
-
         $multimediaMock = $this->createMock(MultimediaEditorial::class);
-        $multimediaMock->method('id')->willReturn($multimediaIdDomainMock);
 
         $bodyMock = $this->createMock(Body::class);
 
@@ -131,18 +127,14 @@ final class ResolverPipelineTest extends TestCase
             ->with($editorialMock, $sectionMock)
             ->willReturn([$signatureData]);
 
-        // Setup multimedia async
-        $this->multimediaResolver
-            ->expects(static::once())
-            ->method('extractMultimediaId')
-            ->willReturn($multimediaIdValue);
-
+        // Setup multimedia async via startAsyncForEditorial
         $mainPromise = $this->createMock(Promise::class);
+        $mainMultimediaResult = new MultimediaResolutionResult(promises: [$mainPromise]);
         $this->multimediaResolver
             ->expects(static::once())
-            ->method('startAsync')
-            ->with([$multimediaIdValue])
-            ->willReturn([$mainPromise]);
+            ->method('startAsyncForEditorial')
+            ->with($editorialMock)
+            ->willReturn($mainMultimediaResult);
 
         // Setup opening
         $openingData = ['opening-key' => ['opening' => 'data']];
@@ -159,29 +151,27 @@ final class ResolverPipelineTest extends TestCase
             ->with($bodyMock)
             ->willReturn(['photo-1' => $photoMock]);
 
-        // Setup inserted news
+        // Setup inserted news (typed DTO)
         $insertedPromise = $this->createMock(Promise::class);
         $this->insertedNewsResolver
             ->expects(static::once())
             ->method('resolve')
-            ->willReturn([
-                'groups' => ['inserted-1' => ['editorial' => $editorialMock, 'section' => $sectionMock, 'signatures' => [], 'multimediaId' => 'mm-1']],
-                'promises' => [$insertedPromise],
-                'multimediaOpening' => [],
-            ]);
+            ->willReturn(new InsertedNewsResult(
+                groups: ['inserted-1' => ['editorial' => $editorialMock, 'section' => $sectionMock, 'signatures' => [], 'multimediaId' => 'mm-1']],
+                multimediaResult: new MultimediaResolutionResult(promises: [$insertedPromise]),
+            ));
 
-        // Setup recommended
+        // Setup recommended (typed DTO)
         $recommendedPromise = $this->createMock(Promise::class);
         $recommendedEditorial = $this->createMock(Editorial::class);
         $this->recommendedResolver
             ->expects(static::once())
             ->method('resolve')
-            ->willReturn([
-                'groups' => ['rec-1' => ['editorial' => $recommendedEditorial, 'section' => $sectionMock, 'signatures' => [], 'multimediaId' => 'mm-2']],
-                'promises' => [$recommendedPromise],
-                'multimediaOpening' => [],
-                'news' => [$recommendedEditorial],
-            ]);
+            ->willReturn(new RecommendedResult(
+                groups: ['rec-1' => ['editorial' => $recommendedEditorial, 'section' => $sectionMock, 'signatures' => [], 'multimediaId' => 'mm-2']],
+                news: [$recommendedEditorial],
+                multimediaResult: new MultimediaResolutionResult(promises: [$recommendedPromise]),
+            ));
 
         // Setup comments
         $this->commentsResolver
@@ -190,7 +180,7 @@ final class ResolverPipelineTest extends TestCase
             ->with($editorialId)
             ->willReturn(42);
 
-        // Settle all promises in batch
+        // Settle all promises in batch (main + inserted + recommended)
         $resolvedMultimedia = $this->createMock(AbstractMultimedia::class);
         $this->multimediaResolver
             ->expects(static::once())
@@ -233,13 +223,12 @@ final class ResolverPipelineTest extends TestCase
         $editorialIdMock = $this->createMock(EditorialId::class);
         $editorialIdMock->method('id')->willReturn($editorialId);
 
-        $widgetMock = $this->createMock(Widget::class);
-
+        $multimediaMock = $this->createMock(MultimediaEditorial::class);
         $bodyMock = $this->createMock(Body::class);
 
         $editorialMock = $this->createMock(Editorial::class);
         $editorialMock->method('id')->willReturn($editorialIdMock);
-        $editorialMock->method('multimedia')->willReturn($widgetMock);
+        $editorialMock->method('multimedia')->willReturn($multimediaMock);
         $editorialMock->method('body')->willReturn($bodyMock);
 
         $sectionMock = $this->createMock(Section::class);
@@ -257,23 +246,20 @@ final class ResolverPipelineTest extends TestCase
         $this->bodyPhotosResolver->method('resolve')->willReturn([]);
         $this->commentsResolver->method('resolve')->willReturn(0);
 
-        // extractMultimediaId returns an ID, but since it's a Widget, startAsync should NOT be called
-        $this->multimediaResolver->method('extractMultimediaId')->willReturn('widget-mm-id');
+        // startAsyncForEditorial returns empty result (Widget check is inside MultimediaResolver)
         $this->multimediaResolver
-            ->expects(static::never())
-            ->method('startAsync');
+            ->method('startAsyncForEditorial')
+            ->willReturn(new MultimediaResolutionResult());
 
-        $this->insertedNewsResolver->method('resolve')->willReturn([
-            'groups' => [],
-            'promises' => [],
-            'multimediaOpening' => [],
-        ]);
-        $this->recommendedResolver->method('resolve')->willReturn([
-            'groups' => [],
-            'promises' => [],
-            'multimediaOpening' => [],
-            'news' => [],
-        ]);
+        $this->insertedNewsResolver->method('resolve')->willReturn(new InsertedNewsResult(
+            groups: [],
+            multimediaResult: new MultimediaResolutionResult(),
+        ));
+        $this->recommendedResolver->method('resolve')->willReturn(new RecommendedResult(
+            groups: [],
+            news: [],
+            multimediaResult: new MultimediaResolutionResult(),
+        ));
 
         // Settle is called with empty array
         $this->multimediaResolver
@@ -318,22 +304,20 @@ final class ResolverPipelineTest extends TestCase
         $this->bodyPhotosResolver->method('resolve')->willReturn([]);
         $this->commentsResolver->method('resolve')->willReturn(0);
 
-        $this->multimediaResolver->method('extractMultimediaId')->willReturn(null);
+        // startAsyncForEditorial returns empty result (no multimedia)
         $this->multimediaResolver
-            ->expects(static::never())
-            ->method('startAsync');
+            ->method('startAsyncForEditorial')
+            ->willReturn(new MultimediaResolutionResult());
 
-        $this->insertedNewsResolver->method('resolve')->willReturn([
-            'groups' => [],
-            'promises' => [],
-            'multimediaOpening' => [],
-        ]);
-        $this->recommendedResolver->method('resolve')->willReturn([
-            'groups' => [],
-            'promises' => [],
-            'multimediaOpening' => [],
-            'news' => [],
-        ]);
+        $this->insertedNewsResolver->method('resolve')->willReturn(new InsertedNewsResult(
+            groups: [],
+            multimediaResult: new MultimediaResolutionResult(),
+        ));
+        $this->recommendedResolver->method('resolve')->willReturn(new RecommendedResult(
+            groups: [],
+            news: [],
+            multimediaResult: new MultimediaResolutionResult(),
+        ));
 
         $this->multimediaResolver
             ->expects(static::once())
@@ -376,26 +360,29 @@ final class ResolverPipelineTest extends TestCase
         $this->bodyPhotosResolver->method('resolve')->willReturn([]);
         $this->commentsResolver->method('resolve')->willReturn(0);
 
-        $this->multimediaResolver->method('extractMultimediaId')->willReturn(null);
+        // startAsyncForEditorial returns empty result
+        $this->multimediaResolver->method('startAsyncForEditorial')->willReturn(new MultimediaResolutionResult());
         $this->multimediaResolver->method('settle')->willReturn([]);
 
         // Opening from main editorial
         $this->openingResolver->method('resolve')->willReturn(['main-opening' => ['data' => 'main']]);
 
-        // Opening from inserted news
-        $this->insertedNewsResolver->method('resolve')->willReturn([
-            'groups' => [],
-            'promises' => [],
-            'multimediaOpening' => ['inserted-opening' => ['data' => 'inserted']],
-        ]);
+        // Opening from inserted news (via MultimediaResolutionResult)
+        $this->insertedNewsResolver->method('resolve')->willReturn(new InsertedNewsResult(
+            groups: [],
+            multimediaResult: new MultimediaResolutionResult(
+                multimediaOpening: ['inserted-opening' => ['data' => 'inserted']],
+            ),
+        ));
 
-        // Opening from recommended
-        $this->recommendedResolver->method('resolve')->willReturn([
-            'groups' => [],
-            'promises' => [],
-            'multimediaOpening' => ['recommended-opening' => ['data' => 'recommended']],
-            'news' => [],
-        ]);
+        // Opening from recommended (via MultimediaResolutionResult)
+        $this->recommendedResolver->method('resolve')->willReturn(new RecommendedResult(
+            groups: [],
+            news: [],
+            multimediaResult: new MultimediaResolutionResult(
+                multimediaOpening: ['recommended-opening' => ['data' => 'recommended']],
+            ),
+        ));
 
         $aggregate = $this->pipeline->resolve($editorialMock);
 

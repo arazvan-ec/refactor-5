@@ -6,6 +6,7 @@ namespace App\Tests\Editorial\Resolver;
 
 use App\Editorial\Resolver\MultimediaResolver;
 use App\Editorial\Resolver\RecommendedResolver;
+use App\Editorial\Resolver\RecommendedResult;
 use App\Editorial\Resolver\SignaturesResolver;
 use App\Infrastructure\Service\MultimediaImageService;
 use Ec\Editorial\Domain\Model\Editorial;
@@ -70,10 +71,11 @@ final class RecommendedResolverTest extends TestCase
 
         $result = $this->resolver->resolve($editorialMock);
 
-        static::assertSame([], $result['groups']);
-        static::assertSame([], $result['promises']);
-        static::assertSame([], $result['news']);
-        static::assertSame([], $result['multimediaOpening']);
+        static::assertInstanceOf(RecommendedResult::class, $result);
+        static::assertSame([], $result->groups);
+        static::assertSame([], $result->multimediaResult->promises);
+        static::assertSame([], $result->news);
+        static::assertSame([], $result->multimediaResult->multimediaOpening);
     }
 
     #[Test]
@@ -133,13 +135,14 @@ final class RecommendedResolverTest extends TestCase
 
         $result = $this->resolver->resolve($mainEditorialMock);
 
-        static::assertCount(1, $result['groups']);
-        static::assertArrayHasKey($recommendedId, $result['groups']);
-        static::assertSame($recommendedEditorialMock, $result['groups'][$recommendedId]['editorial']);
-        static::assertSame($sectionMock, $result['groups'][$recommendedId]['section']);
-        static::assertCount(1, $result['promises']);
-        static::assertCount(1, $result['news']);
-        static::assertSame($recommendedEditorialMock, $result['news'][0]);
+        static::assertInstanceOf(RecommendedResult::class, $result);
+        static::assertCount(1, $result->groups);
+        static::assertArrayHasKey($recommendedId, $result->groups);
+        static::assertSame($recommendedEditorialMock, $result->groups[$recommendedId]['editorial']);
+        static::assertSame($sectionMock, $result->groups[$recommendedId]['section']);
+        static::assertCount(1, $result->multimediaResult->promises);
+        static::assertCount(1, $result->news);
+        static::assertSame($recommendedEditorialMock, $result->news[0]);
     }
 
     #[Test]
@@ -163,8 +166,8 @@ final class RecommendedResolverTest extends TestCase
 
         $result = $this->resolver->resolve($mainEditorialMock);
 
-        static::assertSame([], $result['groups']);
-        static::assertSame([], $result['news']);
+        static::assertSame([], $result->groups);
+        static::assertSame([], $result->news);
     }
 
     #[Test]
@@ -190,6 +193,6 @@ final class RecommendedResolverTest extends TestCase
 
         $result = $this->resolver->resolve($mainEditorialMock);
 
-        static::assertSame([], $result['groups']);
+        static::assertSame([], $result->groups);
     }
 }
